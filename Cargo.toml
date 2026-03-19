@@ -22,6 +22,7 @@ bincode       = "1"
 base64        = "0.21"
 shellexpand   = "3"
 solana-client = "2.2.0"
+solana-transaction-status = "2.2.0"
 tokio         = { version = "1", features = ["full"] }
 
 [[example]]

@@ -12,6 +12,9 @@ use solana_sdk::{
 use solana_dex_demo::{state::{Pool, POOL_SIZE}, DexInstruction};
 use spl_token::state::{Account as TokenAccount, Mint};
 use std::str::FromStr;
+use solana_client::rpc_config::RpcTransactionConfig;
+use solana_transaction_status::UiTransactionEncoding;
+
 
 // Helper function to create a mint
 fn create_mint(
@@ -200,8 +203,34 @@ fn send_get_pool_info(
     tx.sign(&[payer], blockhash);
 
     match client.send_and_confirm_transaction(&tx) {
-        Ok(sig) => println!("  [On-chain] GetPoolInfo tx: {} (check logs for pool state)", sig),
         Err(e)  => eprintln!("  [On-chain] GetPoolInfo failed: {:?}", e),
+        Ok(sig) => {
+            println!("  [On-chain] sig: {}", sig);
+         // ★ 查询交易 logs
+            let result = client.get_transaction_with_config(
+                &sig,
+                RpcTransactionConfig {
+                    encoding: Some(UiTransactionEncoding::Json),
+                    commitment: Some(CommitmentConfig::confirmed()),
+                    max_supported_transaction_version: Some(0),
+                },
+            );
+             if let Ok(tx_meta) = result {
+                if let Some(meta) = tx_meta.transaction.meta {
+                    // log_messages 是 OptionSerializer，需要用 into_option()
+                    if let Some(logs) = Option::<Vec<String>>::from(meta.log_messages) {
+                        println!("  --- Pool Logs ---");
+                        for line in logs {
+                            // 只打印 DEX 程序自己的 msg! 行
+                            if line.starts_with("Program log:") {
+                                println!("  {}", line);
+                            }
+                        }
+                        println!("  -----------------");
+                    }
+                }
+            }
+        }
     }
 }
 
