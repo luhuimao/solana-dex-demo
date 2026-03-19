@@ -1,3 +1,4 @@
+use borsh::BorshDeserialize;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
@@ -114,6 +115,94 @@ fn mint_to(
     let blockhash = client.get_latest_blockhash().unwrap();
     tx.sign(&[payer, authority], blockhash);
     client.send_and_confirm_transaction(&tx).unwrap();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: read pool account data locally and pretty-print the state.
+// No transaction is required – we simply call get_account_data() and
+// deserialise the Borsh bytes with Pool::try_from_slice().
+// ─────────────────────────────────────────────────────────────────────────────
+fn print_pool_info_local(client: &RpcClient, pool_pubkey: &Pubkey) {
+    println!("\n  [Local] Fetching pool account: {}", pool_pubkey);
+    match client.get_account_data(pool_pubkey) {
+        Err(e) => {
+            eprintln!("  [Local] Failed to fetch pool account: {:?}", e);
+            return;
+        }
+        Ok(data) => {
+            match Pool::try_from_slice(&data) {
+                Err(e) => eprintln!("  [Local] Failed to deserialize pool: {:?}", e),
+                Ok(pool) => {
+                    println!("  ┌─ Pool State (local read) ─────────────────────");
+                    println!("  │ initialized  : {}", pool.is_initialized);
+                    println!("  │ token A mint : {}", pool.token_a_mint);
+                    println!("  │ token B mint : {}", pool.token_b_mint);
+                    println!("  │ vault A      : {}", pool.token_a_vault);
+                    println!("  │ vault B      : {}", pool.token_b_vault);
+                    println!("  │ LP mint      : {}", pool.lp_mint);
+                    println!("  │ reserve A    : {}", pool.reserve_a);
+                    println!("  │ reserve B    : {}", pool.reserve_b);
+                    println!("  │ LP supply    : {}", pool.lp_supply);
+                    println!("  │ fee          : {}/{}", pool.fee_numerator, pool.fee_denominator);
+                    // Spot price (×1e6, integer arithmetic only)
+                    if pool.reserve_a > 0 {
+                        let p = pool.reserve_b
+                            .saturating_mul(1_000_000)
+                            / pool.reserve_a;
+                        println!("  │ price A→B    : {}.{:06} B/A", p / 1_000_000, p % 1_000_000);
+                    } else {
+                        println!("  │ price A→B    : n/a (empty pool)");
+                    }
+                    // Constant-product k
+                    match pool.reserve_a.checked_mul(pool.reserve_b) {
+                        Some(k) => println!("  │ k = A×B      : {}", k),
+                        None    => println!("  │ k = A×B      : overflow"),
+                    }
+                    // Per-LP backing
+                    if pool.lp_supply > 0 {
+                        let a_per = pool.reserve_a.saturating_mul(1_000_000) / pool.lp_supply;
+                        let b_per = pool.reserve_b.saturating_mul(1_000_000) / pool.lp_supply;
+                        println!("  │ A per LP×1e6 : {}", a_per);
+                        println!("  │ B per LP×1e6 : {}", b_per);
+                    } else {
+                        println!("  │ A/B per LP   : n/a (no LP supply)");
+                    }
+                    println!("  └───────────────────────────────────────────────");
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: send an on-chain GetPoolInfo instruction and print the returned
+// transaction signature.  The program will emit full pool state via msg!(),
+// which is visible in the transaction logs (e.g. via solana logs or RPC).
+// ─────────────────────────────────────────────────────────────────────────────
+fn send_get_pool_info(
+    client: &RpcClient,
+    payer: &Keypair,
+    program_id: &Pubkey,
+    pool_pubkey: &Pubkey,
+) {
+    let ix_data = borsh::to_vec(&DexInstruction::GetPoolInfo)
+        .expect("Failed to serialize GetPoolInfo");
+
+    // Only one account needed: the pool (read-only, no signer)
+    let ix = Instruction::new_with_bytes(
+        *program_id,
+        &ix_data,
+        vec![AccountMeta::new_readonly(*pool_pubkey, false)],
+    );
+
+    let mut tx = Transaction::new_with_payer(&[ix], Some(&payer.pubkey()));
+    let blockhash = client.get_latest_blockhash().unwrap();
+    tx.sign(&[payer], blockhash);
+
+    match client.send_and_confirm_transaction(&tx) {
+        Ok(sig) => println!("  [On-chain] GetPoolInfo tx: {} (check logs for pool state)", sig),
+        Err(e)  => eprintln!("  [On-chain] GetPoolInfo failed: {:?}", e),
+    }
 }
 
 #[tokio::main]
@@ -298,6 +387,11 @@ async fn main() {
         }
     }
 
+    // --- GET POOL INFO (after AddLiquidity) ---
+    println!("\n=== Pool Info after AddLiquidity ===");
+    print_pool_info_local(&client, &pool.pubkey());
+    send_get_pool_info(&client, &user, &program_id, &pool.pubkey());
+
     // --- SWAP ---
     println!("\nSwapping Tokens (Token A -> Token B)...");
     let swap_data = borsh::to_vec(&DexInstruction::Swap {
@@ -342,6 +436,11 @@ async fn main() {
             return;
         }
     }
+
+    // --- GET POOL INFO (after Swap) ---
+    println!("\n=== Pool Info after Swap ===");
+    print_pool_info_local(&client, &pool.pubkey());
+    send_get_pool_info(&client, &user, &program_id, &pool.pubkey());
 
     // --- REMOVE LIQUIDITY ---
     println!("\nRemoving Liquidity...");
@@ -390,6 +489,11 @@ async fn main() {
             eprintln!("Failed to remove liquidity: {:?}", err);
         }
     }
+
+    // --- GET POOL INFO (after RemoveLiquidity) ---
+    println!("\n=== Pool Info after RemoveLiquidity ===");
+    print_pool_info_local(&client, &pool.pubkey());
+    send_get_pool_info(&client, &user, &program_id, &pool.pubkey());
 
     println!("\nDEX Demo Client execution completed successfully!");
 }

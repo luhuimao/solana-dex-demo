@@ -40,6 +40,10 @@ impl Processor {
                 msg!("DEX: Swap");
                 Self::process_swap(program_id, accounts, amount_in, min_amount_out, a_to_b)
             }
+            DexInstruction::GetPoolInfo => {
+                msg!("DEX: Get Pool Info");
+                Self::process_get_pool_info(accounts)
+            }
         }
     }
 
@@ -399,6 +403,94 @@ impl Processor {
         pool.serialize(&mut *pool_account.data.borrow_mut())?;
 
         msg!("Swap: in={}, out={}, a_to_b={}", amount_in, amount_out, a_to_b);
+        Ok(())
+    }
+
+    // ─────────────────────────── GetPoolInfo ──────────────────────────────
+    //
+    // Read-only query: deserialise the pool account and emit all state fields
+    // via msg! so the caller can parse them from the transaction logs.
+    //
+    // Required accounts (in order):
+    // 0. [] pool_account
+    fn process_get_pool_info(accounts: &[AccountInfo]) -> ProgramResult {
+        let iter = &mut accounts.iter();
+        let pool_account = next_account_info(iter)?;
+
+        let pool = Pool::try_from_slice(&pool_account.data.borrow())
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+
+        if !pool.is_initialized {
+            return Err(crate::error::DexError::NotInitialized.into());
+        }
+
+        // ── Basic pool identity ──────────────────────────────────────────
+        msg!("=== Pool Info ===");
+        msg!("Pool account : {}", pool_account.key);
+        msg!("Initialized  : {}", pool.is_initialized);
+
+        // ── Token mints ──────────────────────────────────────────────────
+        msg!("Token A mint : {}", pool.token_a_mint);
+        msg!("Token B mint : {}", pool.token_b_mint);
+
+        // ── Vault addresses ──────────────────────────────────────────────
+        msg!("Token A vault: {}", pool.token_a_vault);
+        msg!("Token B vault: {}", pool.token_b_vault);
+
+        // ── LP mint ──────────────────────────────────────────────────────
+        msg!("LP mint      : {}", pool.lp_mint);
+
+        // ── Reserves & liquidity ─────────────────────────────────────────
+        msg!("Reserve A    : {}", pool.reserve_a);
+        msg!("Reserve B    : {}", pool.reserve_b);
+        msg!("LP supply    : {}", pool.lp_supply);
+
+        // ── Fee parameters ───────────────────────────────────────────────
+        msg!("Fee          : {}/{}", pool.fee_numerator, pool.fee_denominator);
+
+        // ── Derived metrics ──────────────────────────────────────────────
+        // Spot price: how many units of B you get per unit of A (scaled ×10^6
+        // to preserve precision without floating-point arithmetic).
+        if pool.reserve_a > 0 {
+            // price_b_per_a * 1_000_000  (integer, 6 decimal places embedded)
+            let price_scaled = pool
+                .reserve_b
+                .checked_mul(1_000_000)
+                .and_then(|v| v.checked_div(pool.reserve_a));
+            match price_scaled {
+                Some(p) => msg!("Price A→B    : {}.{:06} B/A (×1e6={})",
+                                p / 1_000_000, p % 1_000_000, p),
+                None    => msg!("Price A→B    : overflow"),
+            }
+        } else {
+            msg!("Price A→B    : n/a (empty pool)");
+        }
+
+        // Constant-product k = reserve_a * reserve_b
+        match pool.reserve_a.checked_mul(pool.reserve_b) {
+            Some(k) => msg!("k (A×B)      : {}", k),
+            None    => msg!("k (A×B)      : overflow"),
+        }
+
+        // Per-LP-token backing (units of A and B redeemable for 1 LP token,
+        // scaled ×10^6 for readability).
+        if pool.lp_supply > 0 {
+            let a_per_lp = pool
+                .reserve_a
+                .checked_mul(1_000_000)
+                .and_then(|v| v.checked_div(pool.lp_supply));
+            let b_per_lp = pool
+                .reserve_b
+                .checked_mul(1_000_000)
+                .and_then(|v| v.checked_div(pool.lp_supply));
+            msg!("A per LP×1e6 : {}", a_per_lp.unwrap_or(0));
+            msg!("B per LP×1e6 : {}", b_per_lp.unwrap_or(0));
+        } else {
+            msg!("A per LP×1e6 : n/a (no LP supply)");
+            msg!("B per LP×1e6 : n/a (no LP supply)");
+        }
+
+        msg!("=== End Pool Info ===");
         Ok(())
     }
 }

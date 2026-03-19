@@ -27,6 +27,7 @@ solana_dex_demo/
 | `AddLiquidity` | 存入 Token A + Token B，铸造 LP Token |
 | `RemoveLiquidity` | 燃烧 LP Token，按比例取回 Token A + Token B |
 | `Swap` | 使用常数乘积公式兑换 Token（支持 A→B 和 B→A） |
+| `GetPoolInfo` | **只读**查询：链上打印池的全部状态（余额、价格、k 值等），结果从交易 logs 中读取 |
 
 ---
 
@@ -73,7 +74,9 @@ seeds = ["pool_authority", pool_account_pubkey]
 
 ---
 
-## 账户布局（InitializePool 示例）
+## 账户布局
+
+### InitializePool
 
 ```
 0. [signer, writable]  pool_account     — 预分配 202 字节
@@ -85,6 +88,25 @@ seeds = ["pool_authority", pool_account_pubkey]
 6. []                  pool_authority   — PDA：seeds=["pool_authority", pool]
 7. []                  token_program
 ```
+
+### GetPoolInfo
+
+```
+0. []  pool_account   — 只读，无需 signer
+```
+
+链上程序通过 `msg!` 输出以下信息，可从交易 logs 中解析：
+
+| 字段 | 说明 |
+|------|------|
+| `Reserve A / B` | 池内 Token A / B 当前余额 |
+| `LP supply` | LP Token 总发行量 |
+| `Price A→B` | 即时现货价格（×10⁶ 精度，纯整数运算）|
+| `k (A×B)` | 恒积常数 k |
+| `A/B per LP×1e6` | 每枚 LP Token 可赎回的底层 token 数量 |
+| `Fee` | 手续费（分子/分母）|
+
+客户端也可通过 `get_account_data()` + `Pool::try_from_slice()` **本地解析**，无需发送交易。
 
 ---
 
@@ -111,15 +133,30 @@ test math::tests::test_lp_first_deposit_equal ... ok
 test result: ok. 9 passed
 ```
 
-### 3. 本地部署
+### 3. 运行客户端示例
+
+> 运行前请确保本地验证器已启动，且程序已部署（见步骤 4）。
+
+```bash
+cargo run --example client
+```
+
+客户端会依次执行：`InitializePool` → `AddLiquidity` → `GetPoolInfo` → `Swap` → `GetPoolInfo` → `RemoveLiquidity` → `GetPoolInfo`，并在每次操作后打印池的实时状态。
+
+### 4. 本地部署
 
 ```bash
 # 启动本地验证节点
 solana-test-validator
 
-# 部署
-solana program deploy ./target/deploy/solana_dex_demo.so
+# 编译 SBF 程序
+cargo build-sbf
+
+# 部署（首次 / 每次修改程序后都需重新部署）
+solana program deploy ./target/deploy/solana_dex_demo.so --url localhost
 ```
+
+> ⚠️ 每次修改链上程序后务必重新 `build-sbf` + `program deploy`，否则客户端发送新指令将因反序列化失败而报错。
 
 ---
 

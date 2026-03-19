@@ -99,4 +99,14 @@ pub enum DexInstruction {
         min_amount_out: u64, // slippage guard
         a_to_b: bool,        // true → swap A→B, false → swap B→A
     },
+
+    /// Query pool state and log all relevant information on-chain.
+    ///
+    /// This is a **read-only** instruction – no tokens are moved and no state
+    /// is mutated.  All queried values are emitted via `msg!` so they can be
+    /// retrieved from the transaction logs by the client.
+    ///
+    /// Accounts (in order):
+    /// 0. `[]` pool_account  – the pool whose state you want to read
+    GetPoolInfo,
 }
