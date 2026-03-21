@@ -1,0 +1,81 @@
+warning: unused import: `Transfer`
+ --> programs/anchor_dex/src/lib.rs:2:91
+  |
+2 | ...e, Transfer, T...
+  |       ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `anchor_dex` (lib) generated 1 warning (run `cargo fix --lib -p anchor_dex` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 0.18s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (/Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/target/debug/deps/anchor_dex-19c92d1a92d96a6a)
+
+Found a 'test' script in the Anchor.toml. Running it as a test suite!
+
+Running test suite: "/Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/Anchor.toml"
+
+yarn run v1.22.22
+$ '/Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/node_modules/.bin/ts-mocha' -p ./tsconfig.json -t 1000000 'tests/**/*.ts'
+
+
+  anchor_dex
+  ✓ Pool initialized, fee=3/1000
+    ✔ InitializePool (972ms)
+    1) AddLiquidity
+    2) Swap A→B
+    3) RemoveLiquidity
+  ✓ GetPoolInfo tx: 3b7nRMGzhHC88diFenCbMW66RWq2gNEeUQ41SxRoxLyN58ryYzxCeT2erEDdYRkzUL5GeLN6dDoCLZgFhTUyzxeX (check logs for pool state)
+    4) GetPoolInfo
+
+
+  1 passing (4s)
+  4 failing
+
+  1) anchor_dex
+       AddLiquidity:
+     Error: Account `tokenAMint` not provided.
+      at /Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/node_modules/@coral-xyz/anchor/src/program/common.ts:51:15
+      at Array.forEach (<anonymous>)
+      at validateAccounts (node_modules/@coral-xyz/anchor/src/program/common.ts:46:14)
+      at ix (node_modules/@coral-xyz/anchor/src/program/namespace/instruction.ts:44:23)
+      at txFn (node_modules/@coral-xyz/anchor/src/program/namespace/transaction.ts:24:14)
+      at MethodsBuilder.rpc [as _rpcFn] (node_modules/@coral-xyz/anchor/src/program/namespace/rpc.ts:21:18)
+      at MethodsBuilder.rpc (node_modules/@coral-xyz/anchor/src/program/namespace/methods.ts:434:17)
+
+  2) anchor_dex
+       Swap A→B:
+     Error: Account `tokenAMint` not provided.
+      at /Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/node_modules/@coral-xyz/anchor/src/program/common.ts:51:15
+      at Array.forEach (<anonymous>)
+      at validateAccounts (node_modules/@coral-xyz/anchor/src/program/common.ts:46:14)
+      at ix (node_modules/@coral-xyz/anchor/src/program/namespace/instruction.ts:44:23)
+      at txFn (node_modules/@coral-xyz/anchor/src/program/namespace/transaction.ts:24:14)
+      at MethodsBuilder.rpc [as _rpcFn] (node_modules/@coral-xyz/anchor/src/program/namespace/rpc.ts:21:18)
+      at MethodsBuilder.rpc (node_modules/@coral-xyz/anchor/src/program/namespace/methods.ts:434:17)
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+  3) anchor_dex
+       RemoveLiquidity:
+     Error: Account `tokenAMint` not provided.
+      at /Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/node_modules/@coral-xyz/anchor/src/program/common.ts:51:15
+      at Array.forEach (<anonymous>)
+      at validateAccounts (node_modules/@coral-xyz/anchor/src/program/common.ts:46:14)
+      at ix (node_modules/@coral-xyz/anchor/src/program/namespace/instruction.ts:44:23)
+      at txFn (node_modules/@coral-xyz/anchor/src/program/namespace/transaction.ts:24:14)
+      at MethodsBuilder.rpc [as _rpcFn] (node_modules/@coral-xyz/anchor/src/program/namespace/rpc.ts:21:18)
+      at MethodsBuilder.rpc (node_modules/@coral-xyz/anchor/src/program/namespace/methods.ts:434:17)
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+  4) anchor_dex
+       GetPoolInfo:
+     AssertionError: expected false to be truthy
+      at /Users/benjamin/Library/Mobile Documents/com~apple~CloudDocs/Documents/github/luhuimao/Rust/solana_dex_demo/anchor_dex/tests/anchor_dex.ts:208:12
+      at Generator.next (<anonymous>)
+      at fulfilled (tests/anchor_dex.ts:38:58)
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+
+
+error Command failed with exit code 4.
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
